@@ -27,6 +27,8 @@ let token = {
   token_type: null,
 };
 
+let messageMapping = {};
+
 async function getToken() {
   let clientCredentials = await fetch(
     `https://id.twitch.tv/oauth2/token?client_id=${process.env.TWITCH_CLIENT_ID}&client_secret=${process.env.TWITCH_CLIENT_SECRET}&grant_type=client_credentials`,
@@ -161,7 +163,8 @@ app.post("/", async (req, res) => {
             ],
           };
           for (let webhook of webhooks) {
-            //if (webhook.twitch != notification.event.broadcaster_user_id) continue;
+            if (webhook.twitch != notification.event.broadcaster_user_id)
+              continue;
             let response = await fetch(`${webhook.url}?wait=true`, {
               method: "POST",
               headers: {
@@ -173,7 +176,40 @@ app.post("/", async (req, res) => {
                 components: [component],
               }),
             });
-            console.log(`${response.status} - ${await response.text()}`);
+            let json = undefined;
+            if (
+              response.headers
+                .get("content-type")
+                .startsWith("application/json")
+            )
+              json = await response.json();
+            messageMapping[`${webhook.twitch}|${webhook.url}`] = json;
+            console.log(
+              `stream.online - ${response.status} - ${json ? JSON.stringify(json) : await response.text()}`,
+            );
+          }
+        } else if (notification.subscription.type == "stream.offline") {
+          let webhooks = JSON.parse(process.env.WEBHOOKS);
+          notification.event.broadcaster_user_id = webhooks[0].twitch;
+          for (let webhook of webhooks) {
+            if (webhook.twitch != notification.event.broadcaster_user_id)
+              continue;
+            if (!messageMapping[`${webhook.twitch}|${webhook.url}`]) continue;
+            let msgId = messageMapping[`${webhook.twitch}|${webhook.url}`].id;
+            let response = await fetch(`${webhook.url}/messages/${msgId}`, {
+              method: "DELETE",
+            });
+            let json = undefined;
+            if (
+              response.headers
+                .get("content-type")
+                .startsWith("application/json")
+            )
+              json = await response.json();
+            delete messageMapping[`${webhook.twitch}|${webhook.url}`];
+            console.log(
+              `stream.offline - ${response.status} - ${json ? JSON.stringify(json) : await response.text()}`,
+            );
           }
         } else {
           console.log(`Event type: ${notification.subscription.type}`);

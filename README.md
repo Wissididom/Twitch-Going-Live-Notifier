@@ -20,7 +20,7 @@
 3. Copy `example.env` to `.env` and fill out it's values
 4. Run `node api/index.js` or `npm start` and let it run in the background (Twitch sends a verification request after creating the EventSub subscription)
 5. Run `node create-online-eventsub-subscription.js` and enter the name of the channel you want to create an EventSub subscription of `channel.raid` for
-7. Twitch now tries to send an verification request to your specified URL and if that succeeds will send you a POST request on each `stream.online` and `stream.offline` event
+6. Twitch now tries to send an verification request to your specified URL and if that succeeds will send you a POST request on each `stream.online` and `stream.offline` event
 
 ### Hosted on Vercel
 
