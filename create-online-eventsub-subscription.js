@@ -9,7 +9,7 @@ let token = {
 };
 
 // https://dev.twitch.tv/docs/api/reference/#create-eventsub-subscription
-async function registerRaidEvent(broadcasterUserId) {
+async function registerStreamOnlineEvent(broadcasterUserId) {
   let data = {
     type: "stream.online",
     version: "1",
@@ -77,7 +77,7 @@ readlineInterface.question(
   "Enter the User whose EventSub-Event you wnat to subscribe:\n",
   async (user) => {
     await getToken();
-    await registerRaidEvent((await getUser(user.toLowerCase())).id);
+    await registerStreamOnlineEvent((await getUser(user.toLowerCase())).id);
     readlineInterface.close();
   },
 );
