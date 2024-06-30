@@ -101,7 +101,7 @@ app.post("/", async (req, res) => {
         if (notification.subscription.type == "stream.online") {
           await getToken();
           let webhooks = JSON.parse(process.env.WEBHOOKS);
-          notification.event.broadcaster_user_id = webhooks[0].twitch;
+          // notification.event.broadcaster_user_id = webhooks[0].twitch;
           let stream = await getStream(
             process.env.TWITCH_CLIENT_ID,
             token.access_token,
@@ -190,7 +190,7 @@ app.post("/", async (req, res) => {
           }
         } else if (notification.subscription.type == "stream.offline") {
           let webhooks = JSON.parse(process.env.WEBHOOKS);
-          notification.event.broadcaster_user_id = webhooks[0].twitch;
+          // notification.event.broadcaster_user_id = webhooks[0].twitch;
           for (let webhook of webhooks) {
             if (webhook.twitch != notification.event.broadcaster_user_id)
               continue;
