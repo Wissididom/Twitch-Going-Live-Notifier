@@ -2,6 +2,7 @@ import "dotenv/config";
 import crypto from "crypto";
 import express from "express";
 import helmet from "helmet";
+import fs from "fs";
 
 const app = express();
 
@@ -99,9 +100,8 @@ app.post("/", async (req, res) => {
     switch (req.headers[MESSAGE_TYPE]) {
       case MESSAGE_TYPE_NOTIFICATION:
         if (notification.subscription.type == "stream.online") {
+          let connections = JSON.parse(fs.readFileSync("connections.json"));
           await getToken();
-          let webhooks = JSON.parse(process.env.WEBHOOKS);
-          // notification.event.broadcaster_user_id = webhooks[0].twitch;
           let stream = await getStream(
             process.env.TWITCH_CLIENT_ID,
             token.access_token,
@@ -112,8 +112,6 @@ app.post("/", async (req, res) => {
             token.access_token,
             notification.event.broadcaster_user_id,
           );
-          notification.event.broadcaster_user_login = user.login;
-          notification.event.broadcaster_user_name = user.display_name;
           let embed = {
             url: `https://www.twitch.tv/${notification.event.broadcaster_user_login}`,
             title: stream?.title ?? "N/A",
@@ -162,20 +160,26 @@ app.post("/", async (req, res) => {
               },
             ],
           };
-          for (let webhook of webhooks) {
-            if (webhook.twitch != notification.event.broadcaster_user_id)
+          for (let connection of connections) {
+            if (
+              connection["twitch-user-id"] !=
+              notification.event.broadcaster_user_id
+            )
               continue;
-            let response = await fetch(`${webhook.url}?wait=true`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
+            let response = await fetch(
+              `${connection["discord-webhook"]}?wait=true`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  content: connection["discord-msg"],
+                  embeds: [embed],
+                  components: [component],
+                }),
               },
-              body: JSON.stringify({
-                content: webhook.discord,
-                embeds: [embed],
-                components: [component],
-              }),
-            });
+            );
             let json = undefined;
             if (
               response.headers
@@ -183,22 +187,37 @@ app.post("/", async (req, res) => {
                 .startsWith("application/json")
             )
               json = await response.json();
-            messageMapping[`${webhook.twitch}|${webhook.url}`] = json;
+            messageMapping[
+              `${connection["twitch-user-id"]}|${connection["discord-webhook"]}`
+            ] = json;
             console.log(
               `stream.online - ${response.status} - ${json ? JSON.stringify(json) : await response.text()}`,
             );
           }
         } else if (notification.subscription.type == "stream.offline") {
-          let webhooks = JSON.parse(process.env.WEBHOOKS);
-          // notification.event.broadcaster_user_id = webhooks[0].twitch;
-          for (let webhook of webhooks) {
-            if (webhook.twitch != notification.event.broadcaster_user_id)
+          let connections = JSON.parse(fs.readFileSync("connections.json"));
+          for (let connection of connections) {
+            if (
+              webhook["twitch-user-id"] !=
+              notification.event.broadcaster_user_id
+            )
               continue;
-            if (!messageMapping[`${webhook.twitch}|${webhook.url}`]) continue;
-            let msgId = messageMapping[`${webhook.twitch}|${webhook.url}`].id;
-            let response = await fetch(`${webhook.url}/messages/${msgId}`, {
-              method: "DELETE",
-            });
+            if (
+              !messageMapping[
+                `${connection["twitch-user-id"]}|${connection["discord-webhook"]}`
+              ]
+            )
+              continue;
+            let msgId =
+              messageMapping[
+                `${connection["twitch-user-id"]}|${connection["discord-webhook"]}`
+              ].id;
+            let response = await fetch(
+              `${connection["discord-webhook"]}/messages/${msgId}`,
+              {
+                method: "DELETE",
+              },
+            );
             let json = undefined;
             if (
               response.headers
@@ -206,7 +225,9 @@ app.post("/", async (req, res) => {
                 .startsWith("application/json")
             )
               json = await response.json();
-            delete messageMapping[`${webhook.twitch}|${webhook.url}`];
+            delete messageMapping[
+              `${webhook["twitch-user-id"]}|${connection["discord-webhook"]}`
+            ];
             console.log(
               `stream.offline - ${response.status} - ${json ? JSON.stringify(json) : await response.text()}`,
             );
